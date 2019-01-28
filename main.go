@@ -29,11 +29,10 @@ func main() {
 		log.Fatal(err)
 	}
 	logger := config.logger()
-	hc, err := httpClient(config.Client)
 	if err != nil {
 		logger.WithError(err).Fatal("failed to initialize http client")
 	}
-	client, err := storage.NewClient(context.Background(), option.WithHTTPClient(hc))
+	client, err := storage.NewClient(context.Background(), option.WithServiceAccountFile(os.Getenv("GOOGLE_APPLICATION_CREDENTIALS")))
 	if err != nil {
 		logger.WithError(err).Fatal("failed to create storage client instance")
 	}
