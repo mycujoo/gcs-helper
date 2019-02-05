@@ -1,0 +1,47 @@
+---
+defaults: &defaults
+  working_directory: /tmp/build
+  environment:
+    IMAGE_NAME: gcs-helper
+    DEBIAN_FRONTEND: noninteractive
+    VERSION: 0.1
+
+version: 2
+
+jobs:
+  build_test_deploy:
+    <<: *defaults
+    docker:
+       - image: mycujoo/gcloud-docker:latest
+    steps:
+      - checkout
+      - setup_remote_docker
+      - run:
+          name: Configure environment and docker login
+          command: |
+            export ARTIFACTORY_PASSWORD=$(vault read -field=value secret/ops/artifactory/password)
+            export ARTIFACTORY_USERNAME=$(vault read -field=value secret/ops/artifactory/username)
+
+            docker login -u ${ARTIFACTORY_USERNAME} -p ${ARTIFACTORY_PASSWORD}  https://mycujoo-streamingcluster-docker.jfrog.io
+
+            echo ${ARTIFACTORY_USERNAME} > /tmp/build/artifactory_username
+            echo ${ARTIFACTORY_PASSWORD} > /tmp/build/artifactory_password
+      - run:
+          name: Build docker image(s)
+          command: |
+
+            if [[ "${CIRCLE_BRANCH}" = "master" ]]; then
+              export VERSION=v${CIRCLE_BUILD_NUM}
+              docker build -t mycujoo-streamingcluster-docker.jfrog.io/${IMAGE_NAME}:${VERSION} .
+              docker tag mycujoo-streamingcluster-docker.jfrog.io/${IMAGE_NAME}:${VERSION} mycujoo-streamingcluster-docker.jfrog.io/${IMAGE_NAME}:latest
+            else
+              export VERSION=v${CIRCLE_BUILD_NUM}-alpha
+              docker build -t mycujoo-streamingcluster-docker.jfrog.io/${IMAGE_NAME}:${VERSION} .
+            fi
+
+workflows:
+  version: 2
+  build_test_deploy:
+    jobs:
+      - build_test_deploy:
+          context: org-global
